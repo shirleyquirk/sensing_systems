@@ -1,0 +1,12 @@
+[Unit]
+Description=OSC Video Player
+After=network.target
+
+[Service]
+Restart=always
+User=pi
+WorkingDirectory=~
+ExecStart=/usr/local/bin/osc_video_player
+
+[Install]
+WantedBy=multi-user.target
