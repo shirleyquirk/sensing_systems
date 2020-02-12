@@ -4,7 +4,7 @@
 #define LOG_DEST "Weichwuermer"
 //#define LOG_DEST "192.168.1.9"
 //undefine LOG_DEST for broadcast address
-#define LOG_PORT 5555
+#define LOG_PORT 5551
 
 #define AP_SSID HOSTNAME"_AP"
 #define AP_PASS "Pangolin303"
@@ -18,11 +18,23 @@ unsigned int perfEncoderCounter=0;
 unsigned int perfOSCReadCounter=0;
 unsigned int perfOSCWriteCounter=0;
 
+TaskHandle_t button_handle;
+TaskHandle_t osc_send_handle;
+TaskHandle_t osc_read_handle;
+TaskHandle_t encoder_handle;
+
 void perf_loop(void *parameters){
   TickType_t last_time = xTaskGetTickCount();
   for(;;){
     TickType_t now = xTaskGetTickCount();
     log_printf("button reads:%d encoder reads:%d osc reads:%d osc writes:%d ota_handler:%d millis:%d\n",perfButtonCounter,perfEncoderCounter,perfOSCReadCounter,perfOSCWriteCounter,perfArduinoOTACounter,now-last_time);
+    log_printf("stack: button:%d encoder:%d osc read:%d osc send:%d ota:%d perf:%d\n",
+                    uxTaskGetStackHighWaterMark(button_handle),
+                    uxTaskGetStackHighWaterMark(encoder_handle),
+                    uxTaskGetStackHighWaterMark(osc_read_handle),
+                    uxTaskGetStackHighWaterMark(osc_send_handle),
+                    uxTaskGetStackHighWaterMark(ota_handle),
+                    uxTaskGetStackHighWaterMark(NULL));
     last_time=now;
     perfButtonCounter=0;
     perfEncoderCounter=0;
@@ -41,7 +53,7 @@ void perf_loop(void *parameters){
 
 #include <FastLED.h>
 #define LEDS_PER_ENC 22
-#define OSC_ADDR_BUFSIZE 32
+#define OSC_ADDR_BUFSIZE 64
 #define MAX_ENCODER_COLOURS 4
 typedef struct encoder_t{
   int val;
@@ -181,7 +193,7 @@ void setup() {
       enc->min_val = ENC_MIN_VAL;
       enc->max_val = ENC_MAX_VAL;
       enc->val = (ENC_MAX_VAL + ENC_MIN_VAL)/2;
-      sprintf(enc->osc_addr,"%s/encoder/%i",pan->osc_addr,j+1);//oh. didn't malloc
+      snprintf(enc->osc_addr,OSC_ADDR_BUFSIZE,"%s/encoder/%i",pan->osc_addr,j+1);//oh. didn't malloc
       enc->updated = false;
       enc->led_offset = j*LEDS_PER_ENC;
       enc->n_gradient_colours = 1;
@@ -197,7 +209,7 @@ void setup() {
       but->led_offset = 3*LEDS_PER_ENC+j;
       but->state_colours[0]=CRGB(0x004444);
       but->state_colours[1]=CRGB(0x444400);
-      sprintf(but->osc_addr,"%s/button/%i",pan->osc_addr,j+1);
+      snprintf(but->osc_addr,OSC_ADDR_BUFSIZE,"%s/button/%i",pan->osc_addr,j+1);
       but->updated=false;
     }
     
@@ -228,49 +240,50 @@ void setup() {
     but->led_offset= LEDS_PER_ENC+j;
     but->state_colours[0]=CRGB(0x004444);
     but->state_colours[1]=CRGB(0x444400);
-    sprintf(but->osc_addr,"%s/button/%i",top->osc_addr,j+1);
+    snprintf(but->osc_addr,OSC_ADDR_BUFSIZE,"%s/button/%i",top->osc_addr,j+1);
     but->updated=false;
   }
 
   enable_panel(&panels[0]);
   
 //  Serial.begin(115200); can't serial if slip
+
     xTaskCreate(
                     button_loop,          /* Task function. */
                     "Button Loop",        /* String with name of task. */
-                    10000,            /* Stack size in bytes. */
+                    2000,            /* Stack size in bytes. */
                     NULL,             /* Parameter passed as input of the task */
                     2,                /* Priority of the task. */
-                    NULL);            /* Task handle. */
+                    &button_handle);            /* Task handle. */
 
     xTaskCreate(
                     encoder_loop,          /* Task function. */
                     "Encoder Loop",        /* String with name of task. */
-                    10000,            /* Stack size in bytes. */
+                    2000,            /* Stack size in bytes. */
                     NULL,             /* Parameter passed as input of the task */
                     2,                /* Priority of the task. */
-                    NULL);            /* Task handle. */
+                    &encoder_handle);            /* Task handle. */
     xTaskCreate(
                     osc_read_loop,          /* Task function. */
                     "OSC Read Loop",        /* String with name of task. */
-                    10000,            /* Stack size in bytes. */
+                    4000,            /* Stack size in bytes. */
                     NULL,             /* Parameter passed as input of the task */
                     2,                /* Priority of the task. */
-                    NULL);            /* Task handle. */
+                    &osc_read_handle);            /* Task handle. */
     xTaskCreate(
                     osc_send_loop,          /* Task function. */
                     "OSC Send Loop",        /* String with name of task. */
-                    10000,            /* Stack size in bytes. */
+                    4000,            /* Stack size in bytes. */
                     NULL,             /* Parameter passed as input of the task */
                     2,                /* Priority of the task. */
-                    NULL);            /* Task handle. */
-//    xTaskCreate(
-//                    perf_loop,          /* Task function. */
-//                    "Perf Monitor Loop",        /* String with name of task. */
-//                    10000,            /* Stack size in bytes. */
-//                    NULL,             /* Parameter passed as input of the task */
-//                    1,                /* Priority of the task. */
-//                    NULL);            /* Task handle. */                 
+                    &osc_send_handle);            /* Task handle. */
+    xTaskCreate(
+                    perf_loop,          /* Task function. */
+                    "Perf Monitor Loop",        /* String with name of task. */
+                    2000,            /* Stack size in bytes. */
+                    NULL,             /* Parameter passed as input of the task */
+                    1,                /* Priority of the task. */
+                    NULL);            /* Task handle. */                 
     log_println("End Of Setup");     
 }
 

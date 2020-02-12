@@ -4,6 +4,7 @@
 
 
 uint16_t readButtons(){
+  //vTaskSuspendAll();//no other task interrupts our data collection please
   digitalWrite(clockPin,LOW);
   digitalWrite(latchPin,HIGH);
   //wait for data to collect
@@ -13,25 +14,28 @@ uint16_t readButtons(){
   //digitalWrite(clockPin,HIGH);
   //digitalWrite(clockPin,LOW);
   //set to serial output
-  delayMicroseconds(1);
-  //ets_delay_us(1);
+  //delayMicroseconds(1);
+  ets_delay_us(1);
   digitalWrite(latchPin,LOW);
   uint16_t out=0;
   for(int i=15;i>=0;i--){
     digitalWrite(clockPin,HIGH);
-    delayMicroseconds(1);//ets_delay_us(1);//
+    ets_delay_us(1);
+    //delayMicroseconds(1);
     out |= digitalRead(dataPin)<<i;
     digitalWrite(clockPin,LOW);
-    delayMicroseconds(1);//ets_delay_us(1);//
+    ets_delay_us(1);
+    //delayMicroseconds(1);
   }
+  //xTaskResumeAll();
   return out;
 }
 
-uint16_t prev_button;
 void button_loop(void * parameters){
   pinMode(dataPin,INPUT_PULLDOWN);
   pinMode(clockPin,OUTPUT);
   pinMode(latchPin,OUTPUT);
+  uint16_t prev_button;
   for(;;){
     uint16_t button = readButtons();
     if (button != prev_button){

@@ -31,7 +31,6 @@
   #endif /*BOARD_HAS_USB_SERIAL*/
 OSCBundle osc_bundle;
 
-
 void osc_send_loop(void * parameters){
   SLIPSerial.begin(115200);//230400,460800
 
@@ -78,9 +77,10 @@ void global_brightness(OSCMessage &msg){
 
 #include "osc_routing.h"
 void osc_read_loop(void *parameters){
-  OSCBundle bundleIN;
-  int size;
+  
   for(;;){
+    OSCBundle bundleIN;
+    int size;
     while(!SLIPSerial.endofPacket())
       if( (size =SLIPSerial.available()) > 0)
       {
@@ -102,7 +102,12 @@ void osc_read_loop(void *parameters){
       bundleIN.route("/earth",osc_route_earth);
 
     }else{
-      log_printf("osc bundle has error\n");
+      log_printf("osc bundle has error:");
+      log_printf(" size: %i",bundleIN.size());
+      char buf[32];
+      bundleIN.getOSCMessage(0)->getAddress(buf);
+      log_printf(" addr:%s",buf);
+      log_printf(" error:%i\n",bundleIN.getOSCMessage(0)->getError());
     }
     perfOSCReadCounter++;
     vTaskDelay(100);

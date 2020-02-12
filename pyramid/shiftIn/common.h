@@ -34,7 +34,27 @@ WiFiUDP udp;
 #define log_println(...) __log(println,__VA_ARGS__)
 #define log_print(...) __log(print,__VA_ARGS__)
 
+
+//#define LOGBUF_SIZE 256
+//char logbuf[LOGBUF_SIZE];
+//TaskHandle_t logging_handle;
+//void log_loop(void *parameters){
+//  for(;;){
+//    if (strlen(logbuf)>0){//strlen(logbuf) > 0
+//      udp.beginPacket(LOG_DEST,LOG_PORT);
+//      udp.printf("%s",logbuf);
+//      strcpy(logbuf,"");
+//      udp.endPacket();
+//    }
+//    vTaskDelay(200);
+//  }
+//}
+//#define SINGLEBUF_SIZE 128
+//#define log_printf(...) do{char buf[SINGLEBUF_SIZE]; snprintf(buf,SINGLEBUF_SIZE,__VA_ARGS__); strncat(logbuf,buf,LOGBUF_SIZE-strlen(logbuf));}while(0)
+
 unsigned int perfArduinoOTACounter=0;
+
+TaskHandle_t ota_handle;
 void ArduinoOTA_handler(void * parameters){
   const TickType_t xDelay = 500 / portTICK_PERIOD_MS;
   for (;;){
@@ -60,26 +80,10 @@ void resetWifi( OSCMessage &msg){
     ESP.restart();
   }
 }
-void OSCMessageTask(void * parameters){
-  const TickType_t xDelay = 500 / portTICK_PERIOD_MS;
-  for (;;){
-    int size;
-    OSCMessage msg;
-    if( (size = udp.parsePacket())>0){
-      while(size--)
-        msg.fill(udp.read());
-      if(!msg.hasError()){
-        msg.dispatch("/resetWifi",resetWifi);
-      }else{
-        log_printf("OSC message error:%s",msg.getError());
-      }
-    }
-    vTaskDelay(xDelay);
-  }
-}
 
 
 void setup_common(){
+  //Serial.begin(115200);
   WiFi.mode(WIFI_STA);
   WiFiManager wm;
   bool res;
@@ -133,13 +137,20 @@ void setup_common(){
   xTaskCreate(
                     ArduinoOTA_handler,          /* Task function. */
                     "ArduinoOTA.handle",        /* String with name of task. */
-                    10000,            /* Stack size in bytes. */
+                    2000,            /* Stack size in bytes. */
                     NULL,             /* Parameter passed as input of the task */
                     1,                /* Priority of the task. */
-                    NULL);            /* Task handle. */
-
-  //osc listening
+                    &ota_handle);            /* Task handle. */
+//  xTaskCreate(
+//                    log_loop,          /* Task function. */
+//                    "Logging",        /* String with name of task. */
+//                    2000,            /* Stack size in bytes. */
+//                    NULL,             /* Parameter passed as input of the task */
+//                    1,                /* Priority of the task. */
+//                    &logging_handle);            /* Task handle. */
+  //osc listening not for pyramid
 //  MDNS.addService("osc", "udp", 8888);
 //  udp.begin(8888);
   log_printf("portTICK_PERIOD_MS=%i\n",portTICK_PERIOD_MS);
+  //Serial.println("End setup_common");
 }
