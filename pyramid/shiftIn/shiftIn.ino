@@ -1,3 +1,4 @@
+
 #define HOSTNAME "Pyramid"
 #define OTA_PASS "Pangolin303"
 
@@ -13,6 +14,8 @@
 
 #define N_PANELS 4
 #include "common.h"
+
+SemaphoreHandle_t button_led_sem=NULL;
 
 
 unsigned int perfButtonCounter=0;
@@ -191,6 +194,9 @@ void encoder_loop(void * parameters){
 #define ENC_MAX_VAL 127
 void setup() {
   setup_common();
+
+  vSemaphoreCreateBinary(button_led_sem);
+  
   //setup leds
   ledsetup();
   //setup panels

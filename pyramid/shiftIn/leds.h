@@ -70,8 +70,13 @@ void led_loop(void *parameters){
           }
         }
     }
-    FastLED.show();
-    perfLEDCounter++;
+    if (xSemaphoreTake(button_led_sem,1)==pdTRUE){//if button working, wait 1 tick to see if it comes back
+      FastLED.show();
+      xSemaphoreGive(button_led_sem);
+      perfLEDCounter++;
+    }else{
+      log_println("LED couldn't take semaphore");
+    }
     vTaskDelay(60);
   }
   

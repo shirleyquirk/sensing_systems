@@ -13,7 +13,7 @@ WiFiUDP udp;
 #include <OSCMessage.h>
 
 const uint64_t pend1mac=0xa4cf129a1a88;
-#define HOSTNAME "Pendulum_2"
+#define HOSTNAME "Pendulum_1"
 
  #include <Stepper.h>
  

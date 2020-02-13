@@ -5,21 +5,27 @@
 
 uint16_t readButtons(){
   //pause the led loop it's fucking with us
-  vTaskSuspend(led_handle);
-  digitalWrite(clockPin,LOW);
-  digitalWrite(latchPin,HIGH);
-  //wait for data to collect
-  //digitalWrite(clockPin,HIGH);
-  //delayMicroseconds(20);
-  //or clock pin high transition, right?
-  //digitalWrite(clockPin,HIGH);
-  //digitalWrite(clockPin,LOW);
-  //set to serial output
-  delayMicroseconds(1);
-  //ets_delay_us(2);
-  digitalWrite(latchPin,LOW);
-  //led can go on now
-  vTaskResume(led_handle);
+  //vTaskSuspend(led_handle); vTaskSuspend doesn't work
+  if (xSemaphoreTake(button_led_sem,2)==pdTRUE){//if led currently 'show'ing, wait 1 tick and try again
+    digitalWrite(clockPin,LOW);
+    digitalWrite(latchPin,HIGH);
+    //wait for data to collect
+    //digitalWrite(clockPin,HIGH);
+    //delayMicroseconds(20);
+    //or clock pin high transition, right?
+    //digitalWrite(clockPin,HIGH);
+    //digitalWrite(clockPin,LOW);
+    //set to serial output
+    delayMicroseconds(1);
+    //ets_delay_us(2);
+    digitalWrite(latchPin,LOW);
+    //led can go on now
+    //vTaskResume(led_handle);
+    xSemaphoreGive(button_led_sem);
+  }else{//couldn't get semaphore
+    log_println("Button Couldn't take semaphore!");
+    return 0;
+  }
   delayMicroseconds(1);
   uint16_t out=0;
   for(int i=15;i>=0;i--){
@@ -45,7 +51,8 @@ void button_loop(void * parameters){
   pinMode(latchPin,OUTPUT);
   uint16_t prev_button;
   for(;;){
-    uint16_t button = readButtons();
+    uint16_t button = readButtons();//this can now fail. 0 would be pretty unlikely lets say that's an error
+    if (button==0) continue;//try again
     if (button != prev_button){
       log_println(button,BIN);
       for (int i=0;i<N_PANELS;i++){
