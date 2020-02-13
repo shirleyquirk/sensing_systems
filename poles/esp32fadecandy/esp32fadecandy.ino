@@ -281,7 +281,6 @@ void loop() {
         //FastLED.delay(20);
         yield();
         if (perfPacketCounter>30) log_performance();
-        //vTaskDelayUntil(&xTimestamp,30);//hardcoded 30fps
         vTaskDelay(5);
       }
       client.stop();

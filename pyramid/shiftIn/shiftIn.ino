@@ -11,29 +11,34 @@
 
 
 
+#define N_PANELS 4
 #include "common.h"
+
 
 unsigned int perfButtonCounter=0;
 unsigned int perfEncoderCounter=0;
 unsigned int perfOSCReadCounter=0;
 unsigned int perfOSCWriteCounter=0;
+unsigned int perfLEDCounter=0;
 
 TaskHandle_t button_handle;
 TaskHandle_t osc_send_handle;
 TaskHandle_t osc_read_handle;
 TaskHandle_t encoder_handle;
-
+TaskHandle_t led_handle;
+void led_loop(void* parameters);
 void perf_loop(void *parameters){
   TickType_t last_time = xTaskGetTickCount();
   for(;;){
     TickType_t now = xTaskGetTickCount();
-    log_printf("button reads:%d encoder reads:%d osc reads:%d osc writes:%d ota_handler:%d millis:%d\n",perfButtonCounter,perfEncoderCounter,perfOSCReadCounter,perfOSCWriteCounter,perfArduinoOTACounter,now-last_time);
-    log_printf("stack: button:%d encoder:%d osc read:%d osc send:%d ota:%d perf:%d\n",
+    log_printf("button reads:%d encoder reads:%d osc reads:%d osc writes:%d ota_handler:%d led:%d millis:%d\n",perfButtonCounter,perfEncoderCounter,perfOSCReadCounter,perfOSCWriteCounter,perfArduinoOTACounter,perfLEDCounter,now-last_time);
+    log_printf("stack: button:%d encoder:%d osc read:%d osc send:%d ota:%d led:%d perf:%d\n",
                     uxTaskGetStackHighWaterMark(button_handle),
                     uxTaskGetStackHighWaterMark(encoder_handle),
                     uxTaskGetStackHighWaterMark(osc_read_handle),
                     uxTaskGetStackHighWaterMark(osc_send_handle),
                     uxTaskGetStackHighWaterMark(ota_handle),
+                    uxTaskGetStackHighWaterMark(led_handle),
                     uxTaskGetStackHighWaterMark(NULL));
     last_time=now;
     perfButtonCounter=0;
@@ -41,7 +46,21 @@ void perf_loop(void *parameters){
     perfOSCReadCounter=0;
     perfOSCWriteCounter=0;
     perfArduinoOTACounter=0;
-    vTaskDelay(2000);
+    if (perfLEDCounter==0){
+      //led loop may have crashed
+      //hack it back alive
+      log_printf("RESARTING LED TASK\n");
+      vTaskDelete(led_handle);
+          xTaskCreate(
+                    led_loop,          /* Task function. */
+                    "Led Loop",        /* String with name of task. */
+                    2000,            /* Stack size in bytes. */
+                    NULL,             /* Parameter passed as input of the task */
+                    1,                /* Priority of the task. */
+                    &led_handle);            /* Task handle. */ 
+    }
+    perfLEDCounter=0;
+    vTaskDelay(10000);
   }
 }
 
@@ -50,11 +69,12 @@ void perf_loop(void *parameters){
 #define panel_a_en_pin GPIO_NUM_12
 #define panel_b_en_pin GPIO_NUM_26
 #define panel_c_en_pin GPIO_NUM_15
-
+#define FASTLED_ESP32_I2S true
 #include <FastLED.h>
 #define LEDS_PER_ENC 22
 #define OSC_ADDR_BUFSIZE 64
 #define MAX_ENCODER_COLOURS 4
+
 typedef struct encoder_t{
   int val;
   int max_val;
@@ -86,15 +106,15 @@ typedef struct panel_t{
   uint8_t n_buttons;
   button_t *buttons;
   CRGB *leds;
-  int led_pin;
   int n_leds;
   const char * osc_addr;
   int button_offset;
 }panel_t;
 
-#define N_PANELS 4
 panel_t panels[N_PANELS];
 
+
+#include "leds.h"
 //#include "encoders.h"
 #include "buttons.h"
 
@@ -112,8 +132,6 @@ panel_t panels[N_PANELS];
 ESP32Encoder encoder[4];
 
 
-
-#define N_VIRT_ENCODERS 10
 
 void encoder_loop(void * parameters){
     // Enable the weak pull down resistors
@@ -173,6 +191,8 @@ void encoder_loop(void * parameters){
 #define ENC_MAX_VAL 127
 void setup() {
   setup_common();
+  //setup leds
+  ledsetup();
   //setup panels
   panels[0].osc_addr = "/moss";
   panels[0].enable_pin = panel_a_en_pin;
@@ -233,18 +253,25 @@ void setup() {
   top->n_buttons = 4;
   top->button_offset=4*3;
   top->buttons = (button_t *)malloc(4*sizeof(button_t));
-  for (int j=0;j<4;j++){
+  button_t *topbut = &(top->buttons[0]);
+  topbut->n_states=1;
+  topbut->state=0;
+  topbut->led_offset = LEDS_PER_ENC+3;
+  topbut->state_colours[0]=CRGB(0x440044);
+  topbut->state_colours[1]=CRGB(0x044440);
+  topbut->updated=false;
+  for (int j=1;j<4;j++){
     button_t *but = &(top->buttons[j]);
     but->n_states=2;
     but->state=0;
-    but->led_offset= LEDS_PER_ENC+j;
+    but->led_offset= LEDS_PER_ENC+j-1;
     but->state_colours[0]=CRGB(0x004444);
     but->state_colours[1]=CRGB(0x444400);
     snprintf(but->osc_addr,OSC_ADDR_BUFSIZE,"%s/button/%i",top->osc_addr,j+1);
     but->updated=false;
   }
 
-  enable_panel(&panels[0]);
+
   
 //  Serial.begin(115200); can't serial if slip
 
@@ -277,13 +304,21 @@ void setup() {
                     NULL,             /* Parameter passed as input of the task */
                     2,                /* Priority of the task. */
                     &osc_send_handle);            /* Task handle. */
+//    xTaskCreate(
+//                    perf_loop,          /* Task function. */
+//                    "Perf Monitor Loop",        /* String with name of task. */
+//                    2000,            /* Stack size in bytes. */
+//                    NULL,             /* Parameter passed as input of the task */
+//                    1,                /* Priority of the task. */
+//                    NULL);            /* Task handle. */   
     xTaskCreate(
-                    perf_loop,          /* Task function. */
-                    "Perf Monitor Loop",        /* String with name of task. */
+                    led_loop,          /* Task function. */
+                    "Led Loop",        /* String with name of task. */
                     2000,            /* Stack size in bytes. */
                     NULL,             /* Parameter passed as input of the task */
                     1,                /* Priority of the task. */
-                    NULL);            /* Task handle. */                 
+                    &led_handle);            /* Task handle. */ 
+    enable_panel(&panels[0]);                    
     log_println("End Of Setup");     
 }
 

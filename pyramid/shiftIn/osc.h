@@ -81,13 +81,14 @@ void osc_read_loop(void *parameters){
   for(;;){
     OSCBundle bundleIN;
     int size;
-    while(!SLIPSerial.endofPacket())
-      if( (size =SLIPSerial.available()) > 0)
-      {
-         while(size--)
-            bundleIN.fill(SLIPSerial.read());
-       }
-    
+    while(!SLIPSerial.endofPacket()) {
+      if( (size =SLIPSerial.available()) > 0){
+           while(size--)
+              bundleIN.fill(SLIPSerial.read());
+         }else{
+      vTaskDelay(100);
+         }
+    }
     if(!bundleIN.hasError()){
       osc_addr_mask=0;
       char buf[32];

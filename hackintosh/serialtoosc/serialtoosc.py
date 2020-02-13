@@ -9,6 +9,7 @@ from SlipLib.sliplib import Driver
 import serial
 import socket
 import socketserver
+import subprocess
 #from pythonosc import udcp_client
 from time import sleep
 import threading
@@ -20,7 +21,9 @@ sock = socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
 #client = SimpleUDPClient(UDP_HOST,UDP_PORT)
 
 #TODO:autodetect serialport
-ser = serial.Serial('/dev/ttyUSB0',115200)
+ret = subprocess.run("ls /dev/ttyUSB*",shell=True,capture_output=True)
+port = ret.stdout.decode("ascii").split("\n")[0]
+ser = serial.Serial(port,115200)
 messages=[]
 drv = Driver()
 

@@ -4,7 +4,7 @@
 Preferences prefs;
 
 #include <WiFiUdp.h>
-const int udp_log_port = 5555;
+const int udp_log_port = 5554;
 IPAddress broadcast_ip;
 WiFiUDP udp;
 
@@ -13,7 +13,7 @@ WiFiUDP udp;
 #include <OSCMessage.h>
 
 const uint64_t pend1mac=0xa4cf129a1a88;
-#define HOSTNAME "Pendulum_1"
+#define HOSTNAME "Pendulum_2"
 
  #include <Stepper.h>
  
@@ -145,7 +145,7 @@ void setup() {
     bool res;
     // res = wm.autoConnect(); // auto generated AP name from chipid
     // res = wm.autoConnect("Pendulum_1_AP"); // anonymous ap
-    
+    wm.setTimeout(120);
     res = wm.autoConnect(HOSTNAME"_AP","Pangolin303"); // password protected ap
     if (res) {
       broadcast_ip = WiFi.localIP();

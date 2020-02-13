@@ -87,6 +87,7 @@ void setup_common(){
   WiFi.mode(WIFI_STA);
   WiFiManager wm;
   bool res;
+  wm.setTimeout(120);
   res = wm.autoConnect(AP_SSID,AP_PASS);//this needs to periodically check to see if our wifi comes online after we boot
   //can connect to fadecandy_ap, get fadecandy_1.local/exit
   if (res){
@@ -137,7 +138,7 @@ void setup_common(){
   xTaskCreate(
                     ArduinoOTA_handler,          /* Task function. */
                     "ArduinoOTA.handle",        /* String with name of task. */
-                    2000,            /* Stack size in bytes. */
+                    2200,            /* Stack size in bytes. */
                     NULL,             /* Parameter passed as input of the task */
                     1,                /* Priority of the task. */
                     &ota_handle);            /* Task handle. */

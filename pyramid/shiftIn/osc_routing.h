@@ -39,7 +39,12 @@ void enable_panel(panel_t* panel){
   panel->enabled=true;
 }
 
-
+void osc_encoder_width(OSCMessage &msg){
+  int ret = -1;
+  if (msg.isInt(0)) ret=msg.getInt(0);
+  if (ret<0) return;
+  encoder_width = ret;
+}
 
 void osc_panel_enable(OSCMessage &msg){
   

@@ -4,7 +4,6 @@
 
 
 uint16_t readButtons(){
-  //vTaskSuspendAll();//no other task interrupts our data collection please
   digitalWrite(clockPin,LOW);
   digitalWrite(latchPin,HIGH);
   //wait for data to collect
@@ -14,20 +13,23 @@ uint16_t readButtons(){
   //digitalWrite(clockPin,HIGH);
   //digitalWrite(clockPin,LOW);
   //set to serial output
-  //delayMicroseconds(1);
-  ets_delay_us(1);
+  delayMicroseconds(1);
+  //ets_delay_us(2);
   digitalWrite(latchPin,LOW);
   uint16_t out=0;
   for(int i=15;i>=0;i--){
     digitalWrite(clockPin,HIGH);
-    ets_delay_us(1);
-    //delayMicroseconds(1);
+
+    //gpio_set_level(GPIO_NUM_5,HIGH);
+    //ets_delay_us(2);
+    delayMicroseconds(1);
     out |= digitalRead(dataPin)<<i;
     digitalWrite(clockPin,LOW);
-    ets_delay_us(1);
-    //delayMicroseconds(1);
+    //gpio_set_level(GPIO_NUM_5,LOW);
+    delayMicroseconds(1);
+    //ets_delay_us(2);
+
   }
-  //xTaskResumeAll();
   return out;
 }
 

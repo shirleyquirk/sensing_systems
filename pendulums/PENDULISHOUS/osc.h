@@ -21,6 +21,10 @@ void stepright(OSCMessage &msg){
   stepper.step(1);
 }
 
+void osc_zero(OSCMessage &msg){
+  float verticality=get_verticality();
+  level_offset = -verticality;
+}
 void adjust(OSCMessage &msg){
   float ret;
   //adjust by float degrees
@@ -118,6 +122,7 @@ void osc_handler(void *parameters){
           msg.dispatch("/rise_degrees",set_rise_degrees);
           msg.dispatch("/stepright",stepright);
           msg.dispatch("/stepleft",stepleft);
+          msg.dispatch("/zero",osc_zero);
           msg.route("/cycle",osc_cycle);
         }else{
               udp.beginPacket(broadcast_ip,udp_log_port);
