@@ -4,6 +4,8 @@
 
 
 uint16_t readButtons(){
+  //pause the led loop it's fucking with us
+  vTaskSuspend(led_handle);
   digitalWrite(clockPin,LOW);
   digitalWrite(latchPin,HIGH);
   //wait for data to collect
@@ -16,14 +18,18 @@ uint16_t readButtons(){
   delayMicroseconds(1);
   //ets_delay_us(2);
   digitalWrite(latchPin,LOW);
+  //led can go on now
+  vTaskResume(led_handle);
+  delayMicroseconds(1);
   uint16_t out=0;
   for(int i=15;i>=0;i--){
+    out |= digitalRead(dataPin)<<i;
     digitalWrite(clockPin,HIGH);
 
     //gpio_set_level(GPIO_NUM_5,HIGH);
     //ets_delay_us(2);
     delayMicroseconds(1);
-    out |= digitalRead(dataPin)<<i;
+
     digitalWrite(clockPin,LOW);
     //gpio_set_level(GPIO_NUM_5,LOW);
     delayMicroseconds(1);

@@ -194,7 +194,7 @@ void setup() {
   udp.endPacket();
 
 
-
+  level();
     udp.beginPacket(broadcast_ip,udp_log_port);
   udp.printf("Levelling\n");
   udp.begin(8888);
