@@ -2,7 +2,7 @@
 int32_t osc_addr_mask;
 //first four bits = panel
 typedef enum {
-  PANEL_MOSS,
+  PANEL_MOSS=0,
   PANEL_EARTH,
   PANEL_ORIGIN,
   PANEL_TOP,
@@ -13,18 +13,21 @@ typedef enum {
   INPUT_N_3,
   INPUT_N_4
 } osc_addr_mask_t;
-#define PANEL_ALL ((1 << PANEL_TOP) || (1 << PANEL_MOSS) || (1 << PANEL_EARTH) || (1<<PANEL_ORIGIN))
-#define INPUT_ALL ((1 << INPUT_ENC) || (1 <<INPUT_BUT))
-#define INPUT_N_ALL ((1 << INPUT_N_1) || (1 << INPUT_N_2) || (1 << INPUT_N_3) || (1 << INPUT_N_4))
+#define PANEL_ALL 15
+//((1 << PANEL_TOP) || (1 << PANEL_MOSS) || (1 << PANEL_EARTH) || (1<<PANEL_ORIGIN))
+const int INPUT_ALL = ((1 << INPUT_ENC) | (1 <<INPUT_BUT));
+const int INPUT_N_ALL = ((1 << INPUT_N_1) | (1 << INPUT_N_2) | (1 << INPUT_N_3) | (1 << INPUT_N_4));
 
 
 
 
 
 void disable_panel(panel_t* panel){
-  if (panel->has_en_pin)
+  if (panel->has_en_pin){
     gpio_set_level(panel->enable_pin,HIGH);
+  }
   panel->enabled=false;
+  log_println("done.");
 }
 void enable_panel(panel_t* panel){
   if (panel->has_en_pin){//must disable all other panels with en pins
@@ -37,6 +40,7 @@ void enable_panel(panel_t* panel){
     gpio_set_level(panel->enable_pin,LOW);
   }
   panel->enabled=true;
+  log_println("done.");
 }
 
 void osc_encoder_width(OSCMessage &msg){
@@ -47,28 +51,23 @@ void osc_encoder_width(OSCMessage &msg){
 }
 
 void osc_panel_enable(OSCMessage &msg){
-  
-  int panel_idx = -1;
-  log_printf("osc_addr_mask:%x ",osc_addr_mask);
-  while (osc_addr_mask){
-    osc_addr_mask >>= 1;
-    panel_idx++;
+  log_printf("osc_addr_mask: %x\n",osc_addr_mask);
+  for (int i=PANEL_MOSS;i<=PANEL_TOP;i++){
+    if (osc_addr_mask & (1<<i)){
+      log_printf("enabling panel %i...",i);
+      enable_panel(&(panels[i]));
+    }
   }
-  log_printf("panel_idx: %i",panel_idx);
-  if (panel_idx<0) return;
-  if (panel_idx>=N_PANELS) return;
-  enable_panel(&panels[panel_idx]);
 }
 
 void osc_panel_disable(OSCMessage &msg){
-  int panel_idx = -1;
-  while (osc_addr_mask){
-    osc_addr_mask >>= 1;
-    panel_idx++;
+  log_printf("osc_addr_mask: %x\n",osc_addr_mask);
+  for (int i=PANEL_MOSS;i<=PANEL_TOP;i++){
+    if (osc_addr_mask & (1<<i)){
+      log_printf("disabling panel %i...",i);
+        disable_panel(&(panels[i]));
+    }
   }
-  if (panel_idx<0) return;
-  if (panel_idx>=N_PANELS) return;
-  disable_panel(&panels[panel_idx]);
 }
 
 void osc_colour(OSCMessage &msg){

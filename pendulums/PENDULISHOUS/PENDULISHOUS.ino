@@ -4,7 +4,11 @@
 Preferences prefs;
 
 #include <WiFiUdp.h>
-const int udp_log_port = 5554;
+//Pendulum_1: 5552
+//Pendulum_2: 5553
+#define HOSTNAME "Pendulum_1"
+const int udp_log_port = 5552;
+#define LOG_PORT udp_log_port
 IPAddress broadcast_ip;
 WiFiUDP udp;
 
@@ -13,7 +17,7 @@ WiFiUDP udp;
 #include <OSCMessage.h>
 
 const uint64_t pend1mac=0xa4cf129a1a88;
-#define HOSTNAME "Pendulum_1"
+#include "wifi.h"
 
  #include <Stepper.h>
  
@@ -52,66 +56,130 @@ float aX, aY, aZ, aSqrt, gX, gY, gZ, mDirection, mX, mY, mZ;
 float level_offset=2.0;
 int calm_time = 2000;
 int engaged_time = 6000;
-int pause_time = 4000;
+int pause_time = 55000;
 int swing_time = 200000;
 int rise_degrees = 180;
 
 boolean level_changed = 0;
+boolean logging_enabled = 1;
+#define SERIAL_LOGGING 1
 
 void cycle(void * parameters){
-        Serial.println("ON!");
-        udp.beginPacket(broadcast_ip,udp_log_port);
-  udp.printf("ON! calm:%i engaged:%i degrees:%i pause:%i swing:%i\n",calm_time,engaged_time,rise_degrees,pause_time,swing_time);
-  udp.endPacket();
-    delay(calm_time);// Calm before engage!  
-    //vTaskDelay(calm_time);
-    digitalWrite(EM,HIGH);           // Engage EM
-    Serial.printf("EM ENGAGED - PENDULUM LOCKED for %i milliseconds",engaged_time);
-      udp.beginPacket(broadcast_ip,udp_log_port);
-  udp.printf("EM ENGAGED - PENDULUM LOCKED for %i millis\n",engaged_time);
-  udp.endPacket();
-    delay(engaged_time);// Wait till we rise!
-    stepper.step(-degrees_to_steps(rise_degrees));
+  #ifdef SERIAL_LOGGING
+    Serial.println("ON!");
+  #endif/*SERIAL_LOGGING*/
+  if (logging_enabled){
+    udp.beginPacket(broadcast_ip,udp_log_port);
+    udp.printf("ON! calm:%i engaged:%i degrees:%i pause:%i swing:%i\n",calm_time,engaged_time,rise_degrees,pause_time,swing_time);
+    udp.endPacket();
+  }
+  
+  //delay(calm_time);// Calm before engage!  
+  vTaskDelay(calm_time);
+  digitalWrite(EM,HIGH);           // Engage EM
+  
+  #ifdef SERIAL_LOGGING
+    Serial.printf("EM ENGAGED - PENDULUM LOCKED for %i milliseconds\n",engaged_time);
+  #endif/*SERIAL_LOGGING*/
+  if (logging_enabled){
+    udp.beginPacket(broadcast_ip,udp_log_port);
+    udp.printf("EM ENGAGED - PENDULUM LOCKED for %i millis\n",engaged_time);
+    udp.endPacket();
+  }
+  vTaskDelay(engaged_time);
+  //delay(engaged_time);// Wait till we rise!
+
+  #ifdef SERIAL_LOGGING
+    Serial.printf("RISING %i degrees\n",rise_degrees);
+  #endif /*SERIAL_LOGGING*/
+  if (logging_enabled){
+    udp.beginPacket(broadcast_ip,udp_log_port);
+    udp.printf("RISING %i degrees\n",rise_degrees);
+    udp.endPacket();
+  }
+  //  unsigned int start_time=millis();
+  TickType_t start_time = xTaskGetTickCount();
+  //stepper.step(-degrees_to_steps(rise_degrees));
+  level(180.0);
+  
+  #ifdef SERIAL_LOGGING
     Serial.println("Raised to position");
-      udp.beginPacket(broadcast_ip,udp_log_port);
-  udp.printf("Raised to position. pausing for %i millis\n",pause_time);
-  udp.endPacket();
-    delay(pause_time); //pause before DROP 
-    digitalWrite(EM,LOW);           // Disengage EM
+  #endif/*SERIAL_LOGGING*/
+  if (logging_enabled){
+    udp.beginPacket(broadcast_ip,udp_log_port);
+    udp.printf("Raised to position. pausing for %i millis\n",pause_time-(xTaskGetTickCount()-start_time));
+    udp.endPacket();
+  }
+  //unsigned int now = millis();
+  //delay(pause_time-(millis()-start_time)); //pause before DROP 
+  vTaskDelayUntil(&start_time,pause_time);
+  digitalWrite(EM,LOW);           // Disengage EM
+
+  #ifdef SERIAL_LOGGING
     Serial.println("PENDULUM RELEASED!");
-      udp.beginPacket(broadcast_ip,udp_log_port);
-  udp.printf("PENDULUM RELEASED! waiting for %i millis\n",swing_time);
-  udp.endPacket();
-    delay(swing_time); // wait for pendulum to stop!
+  #endif /*SERIAL_LOGGING*/
+  if (logging_enabled){
+    udp.beginPacket(broadcast_ip,udp_log_port);
+    udp.printf("PENDULUM RELEASED! waiting for %i millis\n",swing_time);
+    udp.endPacket();
+  }
+  
+  delay(swing_time); // wait for pendulum to stop!
+
+  #ifdef SERIAL_LOGGING
     Serial.println("Return to home position");
-      udp.beginPacket(broadcast_ip,udp_log_port);
-  udp.printf("Return to home position\n");
-  udp.endPacket();
-    level();
+  #endif /*SERIAL_LOGGING*/
+  if (logging_enabled){
+    udp.beginPacket(broadcast_ip,udp_log_port);
+    udp.printf("Return to home position\n");
+    udp.endPacket();
+  }
+
+  level(0.0);
+
+  #ifdef SERIAL_LOGGING
     Serial.println("Welcome home cowboy - now rest up 'til your next swing");
-      udp.beginPacket(broadcast_ip,udp_log_port);
-  udp.printf("Welcome home cowboy - now rest up 'til your next swing\n");
-  udp.endPacket();
+  #endif /*SERIAL_LOGGING*/
+  if (logging_enabled){
+    udp.beginPacket(broadcast_ip,udp_log_port);
+    udp.printf("Welcome home cowboy - now rest up 'til your next swing\n");
+    udp.endPacket();
+  }
 }
 
-void level() {
+void level(float goal_degrees) { 
   float verticality=get_verticality();
 
-    //if verticality is <0
-      udp.beginPacket(broadcast_ip,udp_log_port);
-      udp.printf("adjusting back to level");
-      udp.endPacket();
-      //27*STEPS would be 360 degrees
-      // so step verticality*27*steps/360
+  if (logging_enabled){
+    udp.beginPacket(broadcast_ip,udp_log_port);
+    udp.printf("adjusting back to %f degrees with offset, %f",goal_degrees,level_offset);
+    udp.endPacket(); 
+  }
+  
+  //27*STEPS would be 360 degrees
+  // so step verticality*27*steps/360
+  int steps = int((verticality-goal_degrees+level_offset)*27.0*float(STEPS) / 360.0);
+  
+  stepper.step(steps);
+  for (int i=0;i<6;i++){
+    verticality = get_verticality();//do it one more time
+    if ((verticality-goal_degrees+level_offset)<0.2){
+      log_println("good enough mate");
+      break;
+    }
+    steps = int((verticality-goal_degrees+level_offset)*27.0*float(STEPS)/360.0);
+    int additional = steps>0?1:-1;
+    stepper.step(steps+additional);
+    stepper.step(-additional);
+    delay(100);
+  }
+  if (logging_enabled){
+    udp.beginPacket(broadcast_ip,udp_log_port);
+    udp.printf("hopefully this is better?\n");
+    udp.endPacket();
+  }
       
-      stepper.step(int((verticality+level_offset)*27.0*float(STEPS)/360.0));
-      verticality = get_verticality();//do it one more time
-      stepper.step(int((verticality+level_offset)*27.0*float(STEPS)/360.0));
-      udp.beginPacket(broadcast_ip,udp_log_port);
-      udp.printf("hopefully this is better?\n");
-      udp.endPacket();
-      
-      get_verticality();
+  float final_vert=get_verticality();//for logging
 
 }
 
@@ -122,14 +190,16 @@ void level() {
 
 void setup() {
     WiFi.mode(WIFI_STA); // explicitly set mode, esp defaults to STA+AP
-    Serial.begin(115200);
+    #ifdef SERIAL_LOGGING
+      Serial.begin(115200);
+    #endif /*SERIAL_LOGGING*/
     delay(200);
     uint8_t mac[6];
     esp_efuse_mac_get_default(mac);
     Serial.printf("MAC ADDR:%x:%x:%x:%x:%x:%x",mac[0],mac[1],mac[2],mac[3],mac[4],mac[5]);
     stepper.setSpeed(18);
-      pinMode(EM, OUTPUT);        
-      digitalWrite(EM,LOW); 
+    pinMode(EM, OUTPUT);        
+    digitalWrite(EM,LOW); 
     delay(1000);
     //WiFiManager, Local intialization. Once its business is done, there is no need to keep it around
     WiFiManager wm;
@@ -145,12 +215,14 @@ void setup() {
     bool res;
     // res = wm.autoConnect(); // auto generated AP name from chipid
     // res = wm.autoConnect("Pendulum_1_AP"); // anonymous ap
-    wm.setTimeout(120);
+    wm.setTimeout(30);
     res = wm.autoConnect(HOSTNAME"_AP","Pangolin303"); // password protected ap
     if (res) {
       broadcast_ip = WiFi.localIP();
       broadcast_ip[3] = 255;
-      Serial.println("Connected to WiFI");
+      #ifdef SERIAL_LOGGING
+        Serial.println("Connected to WiFI");
+      #endif /*SERIAL_LOGGING*/
       udp.beginPacket(broadcast_ip,udp_log_port);
       udp.printf("Connected to WiFi sucessfully, ipaddress = %d.%d.%d.%d\n",broadcast_ip[0],broadcast_ip[1],broadcast_ip[2],WiFi.localIP()[3]);
       udp.endPacket();
@@ -159,8 +231,9 @@ void setup() {
       Serial.println("Failed to connect");
       ESP.restart();
     }
-
-
+    udp.beginPacket(broadcast_ip,udp_log_port);
+    udp.printf("WiFi autoConnect Policy: %d\n",WiFi.getAutoReconnect());
+    udp.endPacket();
   MDNS.addService("osc", "udp", 8888);
 
   #ifdef _ESP32_HAL_I2C_H_ // For ESP32
@@ -194,7 +267,7 @@ void setup() {
   udp.endPacket();
 
 
-  level();
+  level(0.0);
     udp.beginPacket(broadcast_ip,udp_log_port);
   udp.printf("Levelling\n");
   udp.begin(8888);
@@ -214,6 +287,13 @@ void setup() {
                   NULL,             /* Parameter passed as input of the task */
                   1,                /* Priority of the task. */
                   NULL);            /* Task handle. */   
+    xTaskCreate(
+                  wifi_reconnect,          /* Task function. */
+                  "WiFi Reconnect Loop",        /* String with name of task. */
+                  10000,            /* Stack size in bytes. */
+                  NULL,             /* Parameter passed as input of the task */
+                  1,                /* Priority of the task. */
+                  NULL);            /* Task handle. */ 
 }
 
 
@@ -237,15 +317,15 @@ void loop() {
    static unsigned int last_level_time=millis();
    if (level_changed){
     if (millis()-last_level_time > 1000){
-      level();
+      level(0.0);
       level_changed=false;
       last_level_time = millis();
     }
    }
 }
 
-#define N_ACCEL_UPDATES 3
-#define ACCEL_DELAY 20
+#define N_ACCEL_UPDATES 32
+#define ACCEL_DELAY 2
 float get_verticality(){
   float ret=0.0;
     int n=0;
@@ -270,5 +350,7 @@ float get_verticality(){
     udp.beginPacket(broadcast_ip,udp_log_port);
     udp.printf("verticality: %f\n",ret);
     udp.endPacket();
+    //now convert from -180...180 to -90...270
+    if ((ret<-90.0)) ret +=360.0;
     return ret;
 }

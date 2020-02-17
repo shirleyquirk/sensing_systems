@@ -1,10 +1,16 @@
+//fc3: 5556
+//fc2: 5555
+//fc1: 5554
 #define HOSTNAME "Fadecandy_3"
+#define LOG_PORT 5556
+
+
 #define OTA_PASS "Pangolin303"
 
 #define LOG_DEST "Weichwuermer"
 //#define LOG_DEST "192.168.1.9"
 //undefine LOG_DEST for broadcast address
-#define LOG_PORT 5555
+
 
 #define AP_SSID HOSTNAME"_AP"
 #define AP_PASS "Pangolin303"
@@ -42,7 +48,7 @@ frame_t *fbPrev, *fbNext, *fbNew;
 SemaphoreHandle_t frames_mutex;
 int perfFrameCounter=0;
 int perfPacketCounter=0;
-
+TaskHandle_t xFastLED_show_handle;
 
 void setup() {
   Serial.begin(115200);
@@ -68,6 +74,13 @@ void setup() {
     buffers[i].next_frame = &(buffers[(i+1)%N_BUFFERS]);
     buffers[i].prev_frame = &(buffers[(i-1+N_BUFFERS)%N_BUFFERS]);
   }
+      xTaskCreate(
+                fastled_show_task,          /* Task function. */
+                "FastLED.show()",        /* String with name of task. */
+                10000,             /* Stack size in bytes.words? */ 
+                NULL,             /* Parameter passed as input of the task */
+                10,                /* Priority of the task. */
+                &xFastLED_show_handle);            /* Task handle. */  
 
   //////////OPC SERVER///////////
   opc_server.begin();
@@ -168,7 +181,7 @@ int readFully (WiFiClient &client, uint8_t *buf, size_t len) {
 int blockingRead (WiFiClient &client) {
   int b;
   while ((b = client.read()) < 0) {
-    yield();
+    yield();//vTaskDelay(1);?
     if (! client.connected())
       return -1;
   }
@@ -231,7 +244,7 @@ void loop() {
     if (client) {
       log_println("New OPC Client Connected: ");
       TickType_t xTimestamp = xTaskGetTickCount();
-      TaskHandle_t xFastLED_show_handle;
+      
       //fill buffer
       //reset buffers
       for (int i=0;i<N_BUFFERS;i++){
@@ -250,13 +263,6 @@ void loop() {
       frame_delay=1;
       last_pixel_timestamp=0;
       delay_millis=0;
-      xTaskCreate(
-                fastled_show_task,          /* Task function. */
-                "FastLED.show()",        /* String with name of task. */
-                10000,             /* Stack size in bytes.words? */ 
-                NULL,             /* Parameter passed as input of the task */
-                1,                /* Priority of the task. */
-                &xFastLED_show_handle);            /* Task handle. */  
       while (client.connected()){
           int res = readFrame(client,fbNew);
           if (res >= 0) {//only if we've just filled it.
@@ -279,12 +285,12 @@ void loop() {
           }
           
         //FastLED.delay(20);
-        yield();
+        yield();//vPortYield();
         if (perfPacketCounter>30) log_performance();
         vTaskDelay(5);
       }
       client.stop();
-      vTaskDelete(xFastLED_show_handle);
+      //vTaskDelete(xFastLED_show_handle);
       log_println("OPC Client Disconnected");
     }
 

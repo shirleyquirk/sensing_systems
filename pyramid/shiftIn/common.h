@@ -4,7 +4,7 @@
 #include <WiFiUdp.h>
 
 IPAddress broadcast_ip;
-WiFiUDP udp;
+WiFiUDP udp,udp2;
 
 #include <ESPmDNS.h>
 #include <ArduinoOTA.h>
@@ -81,6 +81,19 @@ void resetWifi( OSCMessage &msg){
   }
 }
 
+void wifi_reconnect(void *parameters){
+  for(;;){
+    while (WiFi.status() != WL_CONNECTED){
+      //try to reconnect
+      if (WiFi.reconnect()){
+        vTaskDelay(1000);//wait for logging computer to reconnect too
+        log_println("Reconnected to WiFi");
+      }
+      vTaskDelay(500);
+    }
+    vTaskDelay(1000);
+  }
+}
 
 void setup_common(){
   //Serial.begin(115200);
@@ -142,6 +155,14 @@ void setup_common(){
                     NULL,             /* Parameter passed as input of the task */
                     1,                /* Priority of the task. */
                     &ota_handle);            /* Task handle. */
+
+  xTaskCreate(
+                    wifi_reconnect,          /* Task function. */
+                    "WiFi reconnect",        /* String with name of task. */
+                    2000,            /* Stack size in bytes. */
+                    NULL,             /* Parameter passed as input of the task */
+                    1,                /* Priority of the task. */
+                    NULL);            /* Task handle. */
 //  xTaskCreate(
 //                    log_loop,          /* Task function. */
 //                    "Logging",        /* String with name of task. */
@@ -149,9 +170,10 @@ void setup_common(){
 //                    NULL,             /* Parameter passed as input of the task */
 //                    1,                /* Priority of the task. */
 //                    &logging_handle);            /* Task handle. */
-  //osc listening not for pyramid
-//  MDNS.addService("osc", "udp", 8888);
-//  udp.begin(8888);
+  //osc listening
+  MDNS.addService("osc", "udp", 8888);
+  udp.begin(8888);
+  //udp2.begin(9999);
   log_printf("portTICK_PERIOD_MS=%i\n",portTICK_PERIOD_MS);
   //Serial.println("End setup_common");
 }

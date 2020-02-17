@@ -37,6 +37,19 @@ Preferences prefs;
 #define log_println(...) __log(println,__VA_ARGS__)
 #define log_print(...) __log(print,__VA_ARGS__)
 
+void wifi_reconnect(void *parameters){
+  for(;;){
+    while (WiFi.status() != WL_CONNECTED){
+      //try to reconnect
+      if (WiFi.reconnect()){
+        vTaskDelay(1000);//wait for logging computer to reconnect too
+        log_println("Reconnected to WiFi");
+      }
+      vTaskDelay(500);
+    }
+    vTaskDelay(1000);
+  }
+}
 
 void ArduinoOTA_handler(void * parameters){
   const TickType_t xDelay = 500 / portTICK_PERIOD_MS;
@@ -89,6 +102,7 @@ void setup_common(){
   WiFi.mode(WIFI_STA);
   WiFiManager wm;
   bool res;
+  wm.setTimeout(30);
   res = wm.autoConnect(AP_SSID,AP_PASS);//this needs to periodically check to see if our wifi comes online after we boot
   //can connect to fadecandy_ap, get fadecandy_1.local/exit
   if (res){
@@ -154,5 +168,12 @@ void setup_common(){
                   NULL,             /* Parameter passed as input of the task */
                   2,                /* Priority of the task. */
                   NULL);            /* Task handle. */
+    xTaskCreate(
+                    wifi_reconnect,          /* Task function. */
+                    "WiFi reconnect",        /* String with name of task. */
+                    2000,            /* Stack size in bytes. */
+                    NULL,             /* Parameter passed as input of the task */
+                    1,                /* Priority of the task. */
+                    NULL);            /* Task handle. */
 
 }

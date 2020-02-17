@@ -2,7 +2,9 @@
 #define HOSTNAME "Pyramid"
 #define OTA_PASS "Pangolin303"
 
-#define LOG_DEST "Weichwuermer"
+const IPAddress maxwell(192,168,8,255);
+#define LOG_DEST maxwell
+//"Weichwuermer"
 //#define LOG_DEST "192.168.1.9"
 //undefine LOG_DEST for broadcast address
 #define LOG_PORT 5551
@@ -98,6 +100,7 @@ typedef struct button_t{
   CRGB state_colours[MAX_BUTTON_COLORS]; //want to save this across reboots        32 *3 bytes
   char osc_addr[OSC_ADDR_BUFSIZE];
   boolean updated;
+  boolean momentary;
 }button_t;
 
 typedef struct panel_t{
@@ -182,6 +185,20 @@ void encoder_loop(void * parameters){
             enc->updated=true;
           }
         }
+      }else{//read top encoder anyway
+        if (i==3){//top
+          int16_t c;
+          encoder_t *enc = &(pan.encoders[0]);
+          pcnt_get_counter_value(enc->unit,&c);
+          if(c!=0){
+            pcnt_counter_clear(enc->unit);
+            enc->val += c;
+            if (enc->val > enc->max_val) enc->val = enc->max_val;
+            if (enc->val < enc->min_val) enc->val = enc->min_val;
+            log_printf("top panel encoder val:%i\n",enc->val);
+            enc->updated=true;
+          }
+        }
       }
     }
     perfEncoderCounter++;
@@ -191,12 +208,12 @@ void encoder_loop(void * parameters){
 
 #define ENC_MIN_VAL 0
 
-#define ENC_MAX_VAL 127
+#define ENC_MAX_VAL 255
 void setup() {
   setup_common();
 
   vSemaphoreCreateBinary(button_led_sem);
-  
+
   //setup leds
   ledsetup();
   //setup panels
@@ -232,6 +249,7 @@ void setup() {
       button_t *but = &(pan->buttons[j]);
       but->n_states = 2;
       but->state = 0;
+      but->momentary=false;
       but->led_offset = 3*LEDS_PER_ENC+j;
       but->state_colours[0]=CRGB(0x004444);
       but->state_colours[1]=CRGB(0x444400);
@@ -243,7 +261,7 @@ void setup() {
 
   
   panel_t *top = &panels[3];
-  top->enabled=true;
+  top->enabled=false;
   top->has_en_pin=false;
   top->n_encoders=1;
   top->encoders =(encoder_t *)malloc(1*sizeof(encoder_t));
@@ -269,6 +287,7 @@ void setup() {
   for (int j=1;j<4;j++){
     button_t *but = &(top->buttons[j]);
     but->n_states=2;
+    but->momentary = false;
     but->state=0;
     but->led_offset= LEDS_PER_ENC+j-1;
     but->state_colours[0]=CRGB(0x004444);
@@ -324,7 +343,7 @@ void setup() {
                     NULL,             /* Parameter passed as input of the task */
                     1,                /* Priority of the task. */
                     &led_handle);            /* Task handle. */ 
-    enable_panel(&panels[0]);                    
+    //enable_panel(&panels[0]);                    
     log_println("End Of Setup");     
 }
 

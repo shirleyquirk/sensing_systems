@@ -22,18 +22,24 @@
   #define OSC_MESG_SIZE 128
 
 
-  #ifdef BOARD_HAS_USB_SERIAL
-    #include <SLIPEncodedUSBSerial.h>
-    SLIPEncodedUSBSerial SLIPSerial( thisBoardsSerialUSB );
-  #else
-    #include <SLIPEncodedSerial.h>
-     SLIPEncodedSerial SLIPSerial(Serial);
-  #endif /*BOARD_HAS_USB_SERIAL*/
-OSCBundle osc_bundle;
+//  #ifdef BOARD_HAS_USB_SERIAL
+//    #include <SLIPEncodedUSBSerial.h>
+//    SLIPEncodedUSBSerial SLIPSerial( thisBoardsSerialUSB );
+//  #else
+//    #include <SLIPEncodedSerial.h>
+//     SLIPEncodedSerial SLIPSerial(Serial);
+//  #endif /*BOARD_HAS_USB_SERIAL*/
+
+void restart(OSCMessage &msg){
+  log_println("restarting...\n");
+  delay(500);
+  ESP.restart();
+}
 
 void osc_send_loop(void * parameters){
-  SLIPSerial.begin(115200);//230400,460800
-
+  //SLIPSerial.begin(115200);//230400,460800
+  //IPAddress maxwell(192,168,8,5);
+  OSCBundle osc_bundle;
   for(;;){
     //loop through panels
     for(int i=0;i<N_PANELS;i++){
@@ -52,13 +58,24 @@ void osc_send_loop(void * parameters){
         if (but->updated) {
           osc_bundle.add(but->osc_addr).add(but->state);
           but->updated=false;
+          //special top button dealy
+          if (i==3 && j==0){//top encoder button
+            log_println("sending /playrandom to broadcast:5005");
+            OSCMessage msg("/playrandom");
+            msg.add(1);
+            udp.beginPacket(broadcast_ip,5005);//we need mutexes for this shit
+            msg.send(udp);
+            udp.endPacket();
+          }
         }
       }
     }
     if (osc_bundle.size()>0){
-      SLIPSerial.beginPacket();
-      osc_bundle.send(SLIPSerial);
-      SLIPSerial.endPacket();
+      udp.beginPacket(maxwell,1234);
+      //SLIPSerial.beginPacket();
+      osc_bundle.send(udp);
+      udp.endPacket();
+      //SLIPSerial.endPacket();
       osc_bundle.empty();
     }
     perfOSCWriteCounter++;
@@ -76,41 +93,65 @@ void global_brightness(OSCMessage &msg){
 }
 
 #include "osc_routing.h"
-void osc_read_loop(void *parameters){
-  
-  for(;;){
-    OSCBundle bundleIN;
-    int size;
-    while(!SLIPSerial.endofPacket()) {
-      if( (size =SLIPSerial.available()) > 0){
-           while(size--)
-              bundleIN.fill(SLIPSerial.read());
-         }else{
-      vTaskDelay(100);
-         }
-    }
-    if(!bundleIN.hasError()){
-      osc_addr_mask=0;
-      char buf[32];
-      for (int i=0;i<bundleIN.size();i++){
-        bundleIN.getOSCMessage(i)->getAddress(buf);
-        log_printf("osc msg received: %s\n",buf);
-      }
-      bundleIN.dispatch("/brightness",global_brightness);
-      bundleIN.route("/all",osc_route_all);
-      bundleIN.route("/moss",osc_route_moss);
-      bundleIN.route("/origin",osc_route_origin);
-      bundleIN.route("/earth",osc_route_earth);
 
-    }else{
-      log_printf("osc bundle has error:");
-      log_printf(" size: %i",bundleIN.size());
-      char buf[32];
-      bundleIN.getOSCMessage(0)->getAddress(buf);
-      log_printf(" addr:%s",buf);
-      log_printf(" error:%i\n",bundleIN.getOSCMessage(0)->getError());
-    }
-    perfOSCReadCounter++;
+//void async_osc_read_loop(void *parameters){
+//  if (asudp.listen(8888)){
+//    
+//  }else{
+//    //we're fucked?
+//  }
+//}
+
+void osc_read_loop(void *parameters){
+
+  for(;;){
     vTaskDelay(100);
+    OSCMessage msg;
+    int size;
+    /*
+      while(!SLIPSerial.endofPacket()) {
+        if( (size =SLIPSerial.available()) > 0){
+             while(size--)
+                bundleIN.fill(SLIPSerial.read());
+           }else{
+        vTaskDelay(100);
+           }
+      }
+      //bundle.empty();
+      */
+    msg.empty();
+    if( (size = udp.parsePacket())>0){//asyncudp?
+      if (size == 0) continue;
+      while(size--)
+        msg.fill(udp.read());
+      if(!msg.hasError()){
+        osc_addr_mask=0;
+        char buf[32];
+        //for (int i=0;i<bundleIN.size();i++){
+          //bundleIN.getOSCMessage(i)->getAddress(buf);
+          msg.getAddress(buf);
+          log_printf("osc msg received: %s\n",buf);
+        //}
+        msg.dispatch("/brightness",global_brightness);
+        msg.dispatch("/restart",restart);
+        msg.route("/all",osc_route_all);
+        msg.route("/moss",osc_route_moss);
+        msg.route("/origin",osc_route_origin);
+        msg.route("/earth",osc_route_earth);
+        msg.route("/top",osc_route_top);
+      }else{
+        log_printf("osc bundle has error:");
+        //log_printf(" size: %i",bundleIN.size());
+        char buf[32];
+        //bundleIN.getOSCMessage(0)->getAddress(buf);
+        msg.getAddress(buf);
+        log_printf(" addr:%s",buf);
+        log_printf(" error:%i\n",msg.getError());//bundleIN.getOSCMessage(0)->getError());
+        //send it anyway?
+
+      }
+      perfOSCReadCounter++;
+
+    }//else udp read error
   }
 }

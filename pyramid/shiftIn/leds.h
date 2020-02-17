@@ -2,7 +2,7 @@
 #define PANEL0LEDPIN 25
 #define PANEL1LEDPIN 14
 #define PANEL2LEDPIN 2
-#define PANEL3LEDPIN 0
+#define PANEL3LEDPIN 13
 
 int encoder_width = 50;
 

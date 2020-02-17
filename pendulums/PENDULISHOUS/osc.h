@@ -4,13 +4,14 @@
 #include <OSCData.h>
 
 void start_cycle(OSCMessage &msg){
-      xTaskCreate(
+      xTaskCreatePinnedToCore(
                   cycle,          /* Task function. */
                   "Cycle!",        /* String with name of task. */
                   10000,            /* Stack size in bytes. */
                   NULL,             /* Parameter passed as input of the task */
                   10,                /* Priority of the task. */
-                  NULL);            /* Task handle. */  
+                  NULL,            /* Task handle. */  
+                  1);               /* Task CPU */
 }
 
 void stepleft(OSCMessage &msg){
@@ -20,10 +21,14 @@ void stepleft(OSCMessage &msg){
 void stepright(OSCMessage &msg){
   stepper.step(1);
 }
+void osc_level(OSCMessage &msg){
+  level(0.0);
+}
 
 void osc_zero(OSCMessage &msg){
   float verticality=get_verticality();
   level_offset = -verticality;
+  prefs.putFloat("level_offset",level_offset);
 }
 void adjust(OSCMessage &msg){
   float ret;
@@ -124,6 +129,7 @@ void osc_handler(void *parameters){
           msg.dispatch("/stepleft",stepleft);
           msg.dispatch("/zero",osc_zero);
           msg.route("/cycle",osc_cycle);
+          msg.dispatch("/level",osc_level);
         }else{
               udp.beginPacket(broadcast_ip,udp_log_port);
               udp.printf("OSC message error:%s",msg.getError());
