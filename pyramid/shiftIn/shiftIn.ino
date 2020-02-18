@@ -315,13 +315,13 @@ void setup() {
                     NULL,             /* Parameter passed as input of the task */
                     2,                /* Priority of the task. */
                     &encoder_handle);            /* Task handle. */
-    xTaskCreate(
+    xTaskCreatePinnedToCore(
                     osc_read_loop,          /* Task function. */
                     "OSC Read Loop",        /* String with name of task. */
                     4000,            /* Stack size in bytes. */
                     NULL,             /* Parameter passed as input of the task */
                     2,                /* Priority of the task. */
-                    &osc_read_handle);            /* Task handle. */
+                    &osc_read_handle,1);            /* Task handle. */
     xTaskCreate(
                     osc_send_loop,          /* Task function. */
                     "OSC Send Loop",        /* String with name of task. */
