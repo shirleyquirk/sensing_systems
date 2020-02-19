@@ -7,5 +7,4 @@ port.baudrate=115200
 port.dtr=False
 time.sleep(0.1)
 port.dtr=True
-port.close()
 
