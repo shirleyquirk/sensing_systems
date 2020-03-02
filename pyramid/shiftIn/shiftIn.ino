@@ -71,7 +71,7 @@ void perf_loop(void *parameters){
 
 
 #include "ESP32Encoder.h"
-#define panel_a_en_pin GPIO_NUM_12
+#define panel_a_en_pin GPIO_NUM_27
 #define panel_b_en_pin GPIO_NUM_26
 #define panel_c_en_pin GPIO_NUM_15
 #define FASTLED_ESP32_I2S true
